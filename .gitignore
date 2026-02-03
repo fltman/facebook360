@@ -5,3 +5,4 @@ __pycache__/
 generated/
 gallery/
 .DS_Store
+.claude/settings.local.json
