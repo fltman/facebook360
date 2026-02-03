@@ -52,6 +52,14 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 GALLERY_DIR = Path(__file__).parent / "gallery"
 GALLERY_DIR.mkdir(exist_ok=True)
 
+# Thumbnails directory
+THUMBS_DIR = GALLERY_DIR / "thumbs"
+THUMBS_DIR.mkdir(exist_ok=True)
+
+# Thumbnail dimensions
+THUMB_WIDTH = 300
+THUMB_HEIGHT = 150
+
 # Default target resolution
 DEFAULT_WIDTH = 6000
 DEFAULT_HEIGHT = 3000
@@ -202,6 +210,26 @@ def inject_gpano_metadata(filepath: Path) -> bool:
         return False
 
 
+def create_thumbnail(image_path: Path) -> Path:
+    """Create a thumbnail for a gallery image."""
+    thumb_path = THUMBS_DIR / image_path.name
+
+    try:
+        with Image.open(image_path) as img:
+            # Convert to RGB if needed
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+
+            # Create thumbnail maintaining aspect ratio
+            img.thumbnail((THUMB_WIDTH, THUMB_HEIGHT), Image.Resampling.LANCZOS)
+            img.save(thumb_path, format='JPEG', quality=80)
+
+        return thumb_path
+    except Exception as e:
+        print(f"Error creating thumbnail: {e}")
+        return None
+
+
 def generate_panorama(input_base64: str, mime_type: str, prompt: str,
                       fix_ratio: bool = True, ratio_mode: str = "pad",
                       input_width: int = None, input_height: int = None) -> dict:
@@ -274,6 +302,9 @@ Use the first image as the reference for final aspect ratio. This is an equirect
                     # Inject GPano metadata
                     gpano_success = inject_gpano_metadata(filepath)
 
+                    # Create thumbnail
+                    create_thumbnail(filepath)
+
                     # Re-read file after metadata injection
                     with open(filepath, "rb") as f:
                         final_image = f.read()
@@ -284,6 +315,7 @@ Use the first image as the reference for final aspect ratio. This is an equirect
                         "filename": filename,
                         "filepath": str(filepath),
                         "gallery_url": f"/gallery/{filename}",
+                        "thumb_url": f"/gallery/thumbs/{filename}",
                         "gpano_injected": gpano_success,
                         "message": message.content if message.content else "Image generated successfully"
                     }
@@ -409,6 +441,9 @@ def api_fix_ratio():
             # Inject GPano metadata
             gpano_success = inject_gpano_metadata(gallery_path)
 
+            # Create thumbnail
+            create_thumbnail(gallery_path)
+
             # Re-read file after metadata injection
             with open(gallery_path, "rb") as f:
                 final_image = f.read()
@@ -422,7 +457,8 @@ def api_fix_ratio():
             "image": base64.b64encode(final_image).decode('utf-8'),
             "filename": filename,
             "gpano_injected": gpano_success,
-            "gallery_url": f"/gallery/{filename}" if save_to_gallery else None
+            "gallery_url": f"/gallery/{filename}" if save_to_gallery else None,
+            "thumb_url": f"/gallery/thumbs/{filename}" if save_to_gallery else None
         })
 
     except Exception as e:
@@ -435,11 +471,18 @@ def api_gallery_list():
     images = []
     for filepath in sorted(GALLERY_DIR.glob('*.jpg'), key=lambda p: p.stat().st_mtime, reverse=True):
         stat = filepath.stat()
+        thumb_path = THUMBS_DIR / filepath.name
+
+        # Create thumbnail if missing
+        if not thumb_path.exists():
+            create_thumbnail(filepath)
+
         images.append({
             "filename": filepath.name,
             "size": stat.st_size,
             "created": stat.st_mtime,
-            "url": f"/gallery/{filepath.name}"
+            "url": f"/gallery/{filepath.name}",
+            "thumb_url": f"/gallery/thumbs/{filepath.name}"
         })
     return jsonify({"images": images})
 
@@ -503,6 +546,12 @@ def api_gallery_delete(filename):
 
     try:
         filepath.unlink()
+
+        # Also delete thumbnail if exists
+        thumb_path = THUMBS_DIR / filename
+        if thumb_path.exists():
+            thumb_path.unlink()
+
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -512,6 +561,12 @@ def api_gallery_delete(filename):
 def serve_gallery(filename):
     """Serve a gallery image."""
     return send_from_directory(GALLERY_DIR, filename)
+
+
+@app.route('/gallery/thumbs/<filename>')
+def serve_thumbnail(filename):
+    """Serve a thumbnail image."""
+    return send_from_directory(THUMBS_DIR, filename)
 
 
 @app.route('/api/convert-heic', methods=['POST'])

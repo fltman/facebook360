@@ -867,7 +867,7 @@ Exempel: Transform this into a dystopian Blade Runner future with neon lights, f
         if (data.images && data.images.length > 0) {
           galleryGrid.innerHTML = data.images.map(img => `
             <div class="gallery-item" data-url="${img.url}" data-filename="${img.filename}">
-              <img src="${img.url}" alt="${img.filename}" loading="lazy">
+              <img src="${img.thumb_url || img.url}" alt="${img.filename}" loading="lazy">
               <button class="delete-btn" data-filename="${img.filename}">&times;</button>
               <div class="item-name">${img.filename}</div>
             </div>
