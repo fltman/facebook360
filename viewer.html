@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FB360 Viewer + AI</title>
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #fff;
+      overflow: hidden;
+    }
+
+    #dropzone {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      background: #1a1a2e;
+      transition: opacity 0.3s;
+    }
+
+    #dropzone.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #dropzone.dragover {
+      background: #16213e;
+    }
+
+    .drop-icon {
+      font-size: 80px;
+      margin-bottom: 20px;
+      opacity: 0.8;
+    }
+
+    .drop-text {
+      font-size: 24px;
+      margin-bottom: 10px;
+    }
+
+    .drop-hint {
+      font-size: 14px;
+      opacity: 0.6;
+    }
+
+    #controls {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      z-index: 50;
+      opacity: 0;
+      transition: opacity 0.3s;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 90%;
+    }
+
+    #controls.visible {
+      opacity: 1;
+    }
+
+    .btn {
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .btn.primary {
+      background: rgba(99, 102, 241, 0.8);
+      border-color: rgba(99, 102, 241, 0.9);
+    }
+
+    .btn.primary:hover {
+      background: rgba(99, 102, 241, 1);
+    }
+
+    #info {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 15px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      z-index: 50;
+      opacity: 0;
+      transition: opacity 0.3s;
+      max-width: 300px;
+    }
+
+    #info.visible {
+      opacity: 1;
+    }
+
+    #info h3 {
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    #info p {
+      opacity: 0.7;
+      line-height: 1.4;
+    }
+
+    #help {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 15px 20px;
+      border-radius: 8px;
+      font-size: 12px;
+      z-index: 50;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    #help.visible {
+      opacity: 1;
+    }
+
+    #help div {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    #help div:last-child {
+      margin-bottom: 0;
+    }
+
+    kbd {
+      background: rgba(255, 255, 255, 0.15);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 11px;
+    }
+
+    a-scene {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .a-enter-vr {
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .a-enter-vr.visible {
+      opacity: 1;
+    }
+
+    #fileInput {
+      display: none;
+    }
+
+    #autorotate-indicator {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.8);
+      padding: 15px 25px;
+      border-radius: 8px;
+      font-size: 16px;
+      z-index: 60;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+
+    #autorotate-indicator.show {
+      opacity: 1;
+    }
+
+    #loading {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.9);
+      padding: 30px 40px;
+      border-radius: 12px;
+      z-index: 200;
+      display: none;
+      text-align: center;
+    }
+
+    #loading.show {
+      display: block;
+    }
+
+    #loading .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255,255,255,0.2);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 15px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* AI Panel */
+    #ai-panel {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.9);
+      padding: 20px;
+      border-radius: 12px;
+      z-index: 60;
+      width: 90%;
+      max-width: 600px;
+      display: none;
+    }
+
+    #ai-panel.visible {
+      display: block;
+    }
+
+    #ai-panel h4 {
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #ai-panel h4 span {
+      font-size: 20px;
+    }
+
+    #prompt-input {
+      width: 100%;
+      padding: 12px 15px;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      font-size: 14px;
+      margin-bottom: 10px;
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    #prompt-input:focus {
+      outline: none;
+      border-color: rgba(99, 102, 241, 0.8);
+    }
+
+    #prompt-input::placeholder {
+      color: rgba(255,255,255,0.4);
+    }
+
+    .prompt-suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 15px;
+    }
+
+    .suggestion {
+      background: rgba(255,255,255,0.1);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .suggestion:hover {
+      background: rgba(99, 102, 241, 0.5);
+    }
+
+    .ai-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    /* API status */
+    #api-status {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(239, 68, 68, 0.9);
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      z-index: 100;
+      display: none;
+    }
+
+    #api-status.warning {
+      display: block;
+    }
+
+    /* Gallery panel */
+    #gallery-panel {
+      position: fixed;
+      top: 0;
+      right: -350px;
+      width: 350px;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.95);
+      z-index: 80;
+      transition: right 0.3s;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #gallery-panel.visible {
+      right: 0;
+    }
+
+    #gallery-header {
+      padding: 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    #gallery-header h3 {
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #gallery-close {
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 24px;
+      cursor: pointer;
+      opacity: 0.7;
+    }
+
+    #gallery-close:hover {
+      opacity: 1;
+    }
+
+    #gallery-grid {
+      flex: 1;
+      overflow-y: auto;
+      padding: 15px;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      align-content: start;
+    }
+
+    .gallery-item {
+      aspect-ratio: 2/1;
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+      position: relative;
+      border: 2px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .gallery-item:hover {
+      border-color: rgba(99, 102, 241, 0.8);
+      transform: scale(1.02);
+    }
+
+    .gallery-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .gallery-item .delete-btn {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background: rgba(239, 68, 68, 0.9);
+      border: none;
+      color: #fff;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .gallery-item:hover .delete-btn {
+      opacity: 1;
+    }
+
+    .gallery-item .delete-btn:hover {
+      background: rgba(239, 68, 68, 1);
+    }
+
+    .gallery-item .item-name {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0,0,0,0.7);
+      padding: 4px 8px;
+      font-size: 10px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #gallery-empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 40px 20px;
+      opacity: 0.5;
+    }
+
+    /* Gallery overlay when open */
+    #gallery-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 75;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+
+    #gallery-overlay.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  </style>
+</head>
+<body>
+  <!-- API Status Warning -->
+  <div id="api-status">
+    ⚠️ AI generation disabled - OPENROUTER_API_KEY not set
+  </div>
+
+  <!-- Drop Zone -->
+  <div id="dropzone">
+    <div class="drop-icon">🌐</div>
+    <div class="drop-text">Dra en 360-bild hit</div>
+    <div class="drop-hint">eller klicka för att välja fil</div>
+    <input type="file" id="fileInput" accept="image/*,.heic,.HEIC">
+  </div>
+
+  <!-- Loading -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <div id="loading-text">Laddar...</div>
+  </div>
+
+  <!-- A-Frame Scene -->
+  <a-scene
+    embedded
+    vr-mode-ui="enabled: true"
+    loading-screen="enabled: false"
+  >
+    <a-sky id="sky" rotation="0 -90 0"></a-sky>
+
+    <a-camera
+      id="camera"
+      look-controls="reverseMouseDrag: false; touchEnabled: true"
+      wasd-controls="enabled: false"
+    ></a-camera>
+  </a-scene>
+
+  <!-- Info Panel -->
+  <div id="info">
+    <h3 id="filename">-</h3>
+    <p id="dimensions">-</p>
+  </div>
+
+  <!-- Help Panel -->
+  <div id="help">
+    <div><kbd>Mus</kbd> Dra för att titta</div>
+    <div><kbd>Scroll</kbd> Zooma</div>
+    <div><kbd>Space</kbd> Autorotera</div>
+    <div><kbd>R</kbd> Återställ vy</div>
+    <div><kbd>F</kbd> Fullskärm</div>
+  </div>
+
+  <!-- Gallery Overlay -->
+  <div id="gallery-overlay"></div>
+
+  <!-- Gallery Panel -->
+  <div id="gallery-panel">
+    <div id="gallery-header">
+      <h3>📁 Galleri</h3>
+      <button id="gallery-close">&times;</button>
+    </div>
+    <div id="gallery-grid">
+      <div id="gallery-empty">Inga bilder ännu</div>
+    </div>
+  </div>
+
+  <!-- AI Panel -->
+  <div id="ai-panel">
+    <h4><span>✨</span> AI Panorama Generator</h4>
+    <textarea id="prompt-input" placeholder="Beskriv hur du vill transformera bilden...
+
+Exempel: Transform this into a dystopian Blade Runner future with neon lights, flying cars, and towering megastructures"></textarea>
+    <div class="prompt-suggestions">
+      <div class="suggestion" data-prompt="Transform into a dystopian Blade Runner future with neon lights, rain-soaked streets, and towering megastructures">🌃 Blade Runner</div>
+      <div class="suggestion" data-prompt="Convert to a serene Studio Ghibli anime style with soft colors and whimsical details">🎨 Ghibli Style</div>
+      <div class="suggestion" data-prompt="Transform into an ancient Roman version with marble buildings, togas, and horse-drawn chariots">🏛️ Ancient Rome</div>
+      <div class="suggestion" data-prompt="Make it a snowy winter wonderland with everything covered in fresh snow">❄️ Winter</div>
+      <div class="suggestion" data-prompt="Transform into a post-apocalyptic wasteland with abandoned buildings and overgrown vegetation">🏚️ Post-Apocalypse</div>
+      <div class="suggestion" data-prompt="Convert to a vibrant cyberpunk aesthetic with holographic advertisements and neon everything">💜 Cyberpunk</div>
+    </div>
+    <div class="ai-actions">
+      <button class="btn" id="btnCloseAI">Avbryt</button>
+      <button class="btn primary" id="btnGenerate">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+          <path d="M2 17l10 5 10-5"/>
+          <path d="M2 12l10 5 10-5"/>
+        </svg>
+        Generera
+      </button>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div id="controls">
+    <button class="btn" id="btnOpen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 15v4c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+      </svg>
+      Öppna
+    </button>
+    <button class="btn primary" id="btnAI">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+        <path d="M2 17l10 5 10-5"/>
+        <path d="M2 12l10 5 10-5"/>
+      </svg>
+      AI Transform
+    </button>
+    <button class="btn" id="btnRotate">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M23 4v6h-6M1 20v-6h6"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+      Rotera
+    </button>
+    <button class="btn" id="btnReset">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 6v6l4 2"/>
+      </svg>
+      Återställ
+    </button>
+    <button class="btn" id="btnFullscreen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+      </svg>
+      Fullskärm
+    </button>
+    <button class="btn" id="btnGallery">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7"/>
+        <rect x="14" y="3" width="7" height="7"/>
+        <rect x="14" y="14" width="7" height="7"/>
+        <rect x="3" y="14" width="7" height="7"/>
+      </svg>
+      Galleri
+    </button>
+  </div>
+
+  <!-- Autorotate Indicator -->
+  <div id="autorotate-indicator">Autorotation: <span id="rotate-status">AV</span></div>
+
+  <script>
+    // Elements
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    const sky = document.getElementById('sky');
+    const camera = document.getElementById('camera');
+    const controls = document.getElementById('controls');
+    const info = document.getElementById('info');
+    const help = document.getElementById('help');
+    const filename = document.getElementById('filename');
+    const dimensions = document.getElementById('dimensions');
+    const autorotateIndicator = document.getElementById('autorotate-indicator');
+    const rotateStatus = document.getElementById('rotate-status');
+    const loading = document.getElementById('loading');
+    const loadingText = document.getElementById('loading-text');
+    const aiPanel = document.getElementById('ai-panel');
+    const promptInput = document.getElementById('prompt-input');
+    const apiStatus = document.getElementById('api-status');
+    const galleryPanel = document.getElementById('gallery-panel');
+    const galleryGrid = document.getElementById('gallery-grid');
+    const galleryOverlay = document.getElementById('gallery-overlay');
+
+    // State
+    let isAutorotating = false;
+    let autorotateInterval = null;
+    let currentRotation = -90;
+    let imageLoaded = false;
+    let currentImageData = null;
+    let currentMimeType = null;
+    let currentWidth = 6000;
+    let currentHeight = 3000;
+    let apiConfigured = false;
+
+    // Check API status
+    async function checkApiStatus() {
+      try {
+        const response = await fetch('/api/status');
+        const data = await response.json();
+        apiConfigured = data.api_configured;
+        if (!apiConfigured) {
+          apiStatus.classList.add('warning');
+        }
+      } catch (e) {
+        // Running without server
+        apiStatus.classList.add('warning');
+      }
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      const vrButton = document.querySelector('.a-enter-vr');
+      if (vrButton) vrButton.classList.remove('visible');
+      checkApiStatus();
+    });
+
+    // Drag and drop
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.classList.remove('dragover');
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith('image/')) {
+        loadImage(file);
+      }
+    });
+
+    // Click to open file
+    dropzone.addEventListener('click', () => {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        loadImage(file);
+      }
+    });
+
+    // Check if file is HEIC
+    function isHeicFile(file) {
+      const name = file.name.toLowerCase();
+      return name.endsWith('.heic') || name.endsWith('.heif') ||
+             file.type === 'image/heic' || file.type === 'image/heif';
+    }
+
+    // Convert HEIC to JPEG via server
+    async function convertHeic(base64Data) {
+      const response = await fetch('/api/convert-heic', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64Data })
+      });
+
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      return data;
+    }
+
+    // Fix aspect ratio via server
+    async function fixRatioOnServer(base64Data, originalName) {
+      const response = await fetch('/api/fix-ratio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image: base64Data,
+          mode: 'pad',
+          name: originalName,
+          save_to_gallery: true
+        })
+      });
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      return data;
+    }
+
+    // Load image
+    async function loadImage(file) {
+      showLoading('Laddar bild...');
+      filename.textContent = file.name;
+      currentMimeType = file.type || 'image/jpeg';
+
+      const reader = new FileReader();
+
+      reader.onload = async (e) => {
+        let dataUrl = e.target.result;
+        let base64Data = dataUrl.split(',')[1];
+
+        // Convert HEIC if needed
+        if (isHeicFile(file)) {
+          showLoading('Konverterar HEIC...');
+          try {
+            const converted = await convertHeic(base64Data);
+            base64Data = converted.image;
+            currentMimeType = 'image/jpeg';
+          } catch (err) {
+            hideLoading();
+            alert('Kunde inte konvertera HEIC: ' + err.message);
+            return;
+          }
+        }
+
+        // Fix aspect ratio to 2:1
+        showLoading('Fixar aspect ratio till 2:1...');
+        try {
+          const fixed = await fixRatioOnServer(base64Data, file.name);
+          base64Data = fixed.image;
+          dataUrl = `data:image/jpeg;base64,${base64Data}`;
+          currentMimeType = 'image/jpeg';
+          currentImageData = base64Data;
+          currentWidth = 6000;
+          currentHeight = 3000;
+
+          dimensions.textContent = '6000 × 3000 (2:1 ✓)';
+          if (fixed.gpano_injected) {
+            dimensions.textContent += ' + GPano';
+          }
+
+          const outputName = file.name.replace(/\.[^.]+$/, '_360.jpg');
+          displayImage(dataUrl, outputName);
+        } catch (err) {
+          hideLoading();
+          alert('Kunde inte fixa aspect ratio: ' + err.message);
+        }
+      };
+
+      reader.readAsDataURL(file);
+    }
+
+    // Display image in viewer
+    function displayImage(dataUrl, name) {
+      const texture = new THREE.TextureLoader().load(dataUrl, () => {
+        sky.getObject3D('mesh').material.map = texture;
+        sky.getObject3D('mesh').material.needsUpdate = true;
+
+        hideLoading();
+        dropzone.classList.add('hidden');
+        controls.classList.add('visible');
+        info.classList.add('visible');
+        help.classList.add('visible');
+
+        const vrButton = document.querySelector('.a-enter-vr');
+        if (vrButton) vrButton.classList.add('visible');
+
+        imageLoaded = true;
+        resetView();
+      });
+    }
+
+    // Loading helpers
+    function showLoading(text) {
+      loadingText.textContent = text;
+      loading.classList.add('show');
+    }
+
+    function hideLoading() {
+      loading.classList.remove('show');
+    }
+
+    // Button handlers
+    document.getElementById('btnOpen').addEventListener('click', () => {
+      fileInput.click();
+    });
+
+    document.getElementById('btnRotate').addEventListener('click', toggleAutorotate);
+    document.getElementById('btnReset').addEventListener('click', resetView);
+    document.getElementById('btnFullscreen').addEventListener('click', toggleFullscreen);
+    document.getElementById('btnGallery').addEventListener('click', openGallery);
+    document.getElementById('gallery-close').addEventListener('click', closeGallery);
+    galleryOverlay.addEventListener('click', closeGallery);
+
+    // Gallery functions
+    function openGallery() {
+      galleryPanel.classList.add('visible');
+      galleryOverlay.classList.add('visible');
+      loadGallery();
+    }
+
+    function closeGallery() {
+      galleryPanel.classList.remove('visible');
+      galleryOverlay.classList.remove('visible');
+    }
+
+    async function loadGallery() {
+      try {
+        const response = await fetch('/api/gallery');
+        const data = await response.json();
+
+        if (data.images && data.images.length > 0) {
+          galleryGrid.innerHTML = data.images.map(img => `
+            <div class="gallery-item" data-url="${img.url}" data-filename="${img.filename}">
+              <img src="${img.url}" alt="${img.filename}" loading="lazy">
+              <button class="delete-btn" data-filename="${img.filename}">&times;</button>
+              <div class="item-name">${img.filename}</div>
+            </div>
+          `).join('');
+
+          // Add click handlers
+          document.querySelectorAll('.gallery-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+              if (e.target.classList.contains('delete-btn')) return;
+              loadFromGallery(item.dataset.url, item.dataset.filename);
+            });
+          });
+
+          // Add delete handlers
+          document.querySelectorAll('.gallery-item .delete-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              deleteFromGallery(btn.dataset.filename);
+            });
+          });
+        } else {
+          galleryGrid.innerHTML = '<div id="gallery-empty">Inga bilder ännu</div>';
+        }
+      } catch (err) {
+        console.error('Failed to load gallery:', err);
+      }
+    }
+
+    async function loadFromGallery(url, name) {
+      closeGallery();
+      showLoading('Laddar från galleri...');
+
+      try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const dataUrl = e.target.result;
+          currentImageData = dataUrl.split(',')[1];
+          currentMimeType = 'image/jpeg';
+          filename.textContent = name;
+          dimensions.textContent = '6000 × 3000 (2:1 ✓) + GPano';
+          displayImage(dataUrl, name);
+        };
+        reader.readAsDataURL(blob);
+      } catch (err) {
+        hideLoading();
+        alert('Kunde inte ladda bild: ' + err.message);
+      }
+    }
+
+    async function deleteFromGallery(name) {
+      if (!confirm(`Ta bort ${name}?`)) return;
+
+      try {
+        const response = await fetch(`/api/gallery/${name}`, { method: 'DELETE' });
+        const data = await response.json();
+
+        if (data.success) {
+          loadGallery();
+        } else {
+          alert('Kunde inte ta bort: ' + data.error);
+        }
+      } catch (err) {
+        alert('Fel: ' + err.message);
+      }
+    }
+
+    // AI Panel
+    document.getElementById('btnAI').addEventListener('click', () => {
+      if (!imageLoaded) {
+        alert('Ladda en bild först');
+        return;
+      }
+      aiPanel.classList.add('visible');
+      promptInput.focus();
+    });
+
+    document.getElementById('btnCloseAI').addEventListener('click', () => {
+      aiPanel.classList.remove('visible');
+    });
+
+    // Prompt suggestions
+    document.querySelectorAll('.suggestion').forEach(btn => {
+      btn.addEventListener('click', () => {
+        promptInput.value = btn.dataset.prompt;
+      });
+    });
+
+    // Generate button
+    document.getElementById('btnGenerate').addEventListener('click', generateImage);
+
+    async function generateImage() {
+      const prompt = promptInput.value.trim();
+      if (!prompt) {
+        alert('Skriv en prompt först');
+        return;
+      }
+
+      if (!currentImageData) {
+        alert('Ladda en bild först');
+        return;
+      }
+
+      aiPanel.classList.remove('visible');
+      showLoading('✨ Genererar ny panorama med AI...\nDetta kan ta 30-60 sekunder');
+
+      try {
+        const response = await fetch('/api/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            image: currentImageData,
+            mime_type: currentMimeType,
+            prompt: prompt,
+            width: currentWidth,
+            height: currentHeight
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+          hideLoading();
+          alert('Fel: ' + data.error + (data.message ? '\n' + data.message : ''));
+          return;
+        }
+
+        if (data.success && data.image) {
+          const generatedUrl = `data:image/png;base64,${data.image}`;
+          currentImageData = data.image;
+          currentMimeType = 'image/png';
+          const generatedName = data.filename || 'AI Generated';
+          filename.textContent = generatedName;
+
+          displayImage(generatedUrl, generatedName);
+        } else {
+          hideLoading();
+          alert('Kunde inte generera bild: ' + (data.message || 'Okänt fel'));
+        }
+      } catch (err) {
+        hideLoading();
+        alert('Nätverksfel: ' + err.message);
+      }
+    }
+
+    // Autorotate
+    function toggleAutorotate() {
+      isAutorotating = !isAutorotating;
+
+      rotateStatus.textContent = isAutorotating ? 'PÅ' : 'AV';
+      autorotateIndicator.classList.add('show');
+      setTimeout(() => autorotateIndicator.classList.remove('show'), 1000);
+
+      if (isAutorotating) {
+        autorotateInterval = setInterval(() => {
+          currentRotation -= 0.1;
+          sky.setAttribute('rotation', `0 ${currentRotation} 0`);
+        }, 16);
+      } else {
+        clearInterval(autorotateInterval);
+      }
+    }
+
+    // Reset view
+    function resetView() {
+      currentRotation = -90;
+      sky.setAttribute('rotation', `0 ${currentRotation} 0`);
+
+      const cameraEl = document.getElementById('camera');
+      cameraEl.setAttribute('rotation', '0 0 0');
+
+      if (isAutorotating) {
+        isAutorotating = false;
+        clearInterval(autorotateInterval);
+      }
+    }
+
+    // Fullscreen
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        document.exitFullscreen();
+      }
+    }
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      // Don't trigger shortcuts when typing in textarea
+      if (e.target.tagName === 'TEXTAREA') return;
+
+      if (!imageLoaded) return;
+
+      switch(e.key.toLowerCase()) {
+        case ' ':
+          e.preventDefault();
+          toggleAutorotate();
+          break;
+        case 'r':
+          resetView();
+          break;
+        case 'f':
+          toggleFullscreen();
+          break;
+        case 'g':
+          if (galleryPanel.classList.contains('visible')) {
+            closeGallery();
+          } else {
+            openGallery();
+          }
+          break;
+        case 'escape':
+          aiPanel.classList.remove('visible');
+          closeGallery();
+          break;
+      }
+    });
+
+    // Enter to generate
+    promptInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.metaKey) {
+        generateImage();
+      }
+    });
+
+    // Zoom with scroll
+    let currentFov = 80;
+    document.addEventListener('wheel', (e) => {
+      if (!imageLoaded) return;
+      if (aiPanel.classList.contains('visible')) return;
+
+      currentFov += e.deltaY * 0.05;
+      currentFov = Math.max(30, Math.min(120, currentFov));
+      camera.setAttribute('fov', currentFov);
+    });
+
+    // Load from URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const imageParam = urlParams.get('image');
+    if (imageParam) {
+      showLoading('Laddar bild...');
+      fetch(imageParam)
+        .then(r => r.blob())
+        .then(blob => {
+          const file = new File([blob], imageParam, { type: blob.type });
+          loadImage(file);
+        })
+        .catch(err => {
+          console.error('Could not load image:', err);
+          hideLoading();
+        });
+    }
+  </script>
+</body>
+</html>
