@@ -1,5 +1,7 @@
 # FB360 - Facebook 360 Photo Creator
 
+[![Support me on Patreon](https://img.shields.io/badge/Patreon-Support%20my%20work-FF424D?style=flat&logo=patreon&logoColor=white)](https://www.patreon.com/AndersBjarby)
+
 Konverterar valfri bild till Facebook 360-kompatibelt format genom att justera dimensioner till 2:1 och injicera GPano XMP-metadata.
 
 ## Installation
